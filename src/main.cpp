@@ -2,7 +2,9 @@
 #include "Encoder.h"
 #include "Menu.h"
 #include "Timer.h"
+
 #include "Output.h"
+#include "EinkDisplay.h"
 
 #define ENCODER_PIN_A 2
 #define ENCODER_PIN_B 3
@@ -14,7 +16,7 @@ void setup() {
     menu_init();
     timer_init();
     output_init(OUTPUT_PIN);
-    // Inizializza display e-ink qui (da integrare)
+    eink_init();
 }
 
 void loop() {
@@ -43,8 +45,16 @@ void loop() {
     // Aggiorna output in base allo stato timer
     output_update(timer_is_running() && !timer_is_finished());
 
-    // Aggiorna display e-ink qui (da integrare)
-    // Es: drawMenu(menu_get_cursor(), menu_is_editing(), ...)
+
+    int hh, mm, ss;
+    menu_get_timer(hh, mm, ss);
+    drawMenu(
+        menu_get_cursor(),
+        menu_is_editing(),
+        hh, mm, ss,
+        timer_is_running(),
+        timer_is_finished()
+    );
 
     delay(10);
 }
