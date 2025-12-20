@@ -1,4 +1,3 @@
-
 #include "EPD_Test.h"
 
 void setup() {
