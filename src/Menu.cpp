@@ -1,5 +1,6 @@
 #include "Menu.h"
 #include "Timer.h"
+#include <Arduino.h>
 
 static int cursor = 0;
 static bool editing = false;

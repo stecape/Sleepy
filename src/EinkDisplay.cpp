@@ -1,93 +1,159 @@
-/*
 #include "EinkDisplay.h"
-#include "EPD_2in13g.h"
-#include <stdio.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
+#include <SPI.h>
 
-// Pinout per ESP8266 D1 Mini (pin sicuri per boot)
-#define EINK_CS   D8  // GPIO15
-#define EINK_DC   D1  // GPIO5  (era D3/GPIO0 - conflitto boot!)
-#define EINK_RST  D6  // GPIO12 (era D4/GPIO2 - conflitto boot!)
-#define EINK_BUSY D2  // GPIO4
+// Pin definitions per ESP8266 D1 Mini
+// Puoi modificare questi pin secondo il tuo collegamento
+#define TFT_CS     D8  // Chip select
+#define TFT_RST    D4  // Reset
+#define TFT_DC     D3  // Data/Command
 
-EPD_2in13g epd;
-unsigned char imageBuffer[EPD_2IN13G_WIDTH / 4 * EPD_2IN13G_HEIGHT];
+// Display object
+static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+// Colori per il display TFT
+#define COLOR_BG        ST77XX_BLACK
+#define COLOR_TEXT      ST77XX_WHITE
+#define COLOR_HIGHLIGHT ST77XX_YELLOW
+#define COLOR_EDITING   ST77XX_RED
+#define COLOR_TIMER     ST77XX_CYAN
 
 void eink_init() {
-    Serial.println("Display: Initializing EPD...");
-    epd.init(EINK_CS, EINK_DC, EINK_RST, EINK_BUSY);
+    Serial.println("Display: Initializing TFT ST7735...");
     
-    Serial.println("Display: Test 1 - Clear to BLACK...");
-    epd.clear(EPD_2IN13G_BLACK);
-    delay(3000);
+    // Inizializza il display
+    // Usa INITR_BLACKTAB per la maggior parte dei display 1.77" 128x160
+    // Se il display mostra colori strani, prova INITR_GREENTAB o INITR_REDTAB
+    tft.initR(INITR_BLACKTAB);
     
-    Serial.println("Display: Test 2 - Clear to RED...");
-    epd.clear(EPD_2IN13G_RED);
-    delay(3000);
+    Serial.println("Display: Setting rotation...");
+    tft.setRotation(3); // Landscape mode invertito (160x128)
     
-    Serial.println("Display: Test 3 - Clear to YELLOW...");
-    epd.clear(EPD_2IN13G_YELLOW);
-    delay(3000);
+    Serial.println("Display: Clearing screen...");
+    tft.fillScreen(COLOR_BG);
     
-    Serial.println("Display: Test 4 - Clear to WHITE...");
-    epd.clear(EPD_2IN13G_WHITE);
-    delay(2000);
+    // Schermata iniziale
+    tft.setTextColor(COLOR_TEXT);
+    tft.setTextSize(2);
+    tft.setCursor(20, 40);
+    tft.println("Sleepy");
+    tft.setCursor(20, 60);
+    tft.println("Timer");
     
-    Serial.println("Display: Preparing buffer...");
-    memset(imageBuffer, 0xFF, sizeof(imageBuffer));
+    tft.setTextColor(COLOR_EDITING);
+    tft.setTextSize(1);
+    tft.setCursor(20, 90);
+    tft.println("Ready!");
     
-    Serial.print("Display: Buffer size = ");
-    Serial.print(sizeof(imageBuffer));
-    Serial.print(" bytes, expected = ");
-    Serial.print(EPD_2IN13G_WIDTH / 4 * EPD_2IN13G_HEIGHT);
-    Serial.println(" bytes");
+    delay(1000);
     
-    Serial.println("Display: Drawing text...");
-    epd.drawString(imageBuffer, 10, 10, "Sleepy Timer", EPD_2IN13G_BLACK);
-    
-    Serial.println("Display: Updating display...");
-    epd.display(imageBuffer);
-    
-    Serial.println("Display: Done!");
-    delay(2000);
+    Serial.println("Display: Initialization complete!");
 }
 
 void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bool finished) {
-    // Pulisce buffer
-    memset(imageBuffer, 0xFF, sizeof(imageBuffer));
+    static int lastCursor = -1;
+    static bool lastEditing = false;
+    static int lastHH = -1, lastMM = -1, lastSS = -1;
+    static bool lastRunning = false;
+    static bool lastFinished = false;
+    static bool firstDraw = true;
     
-    // Timer label
-    epd.drawString(imageBuffer, 5, 10, "Timer:", EPD_2IN13G_BLACK);
+    // Prima volta ridisegna tutto
+    if (firstDraw) {
+        tft.fillScreen(COLOR_BG);
+        
+        // Titolo
+        tft.setTextColor(COLOR_TEXT);
+        tft.setTextSize(1);
+        tft.setCursor(5, 5);
+        tft.println("TIMER");
+        
+        firstDraw = false;
+    }
     
-    // Timer value
-    char buf[16];
-    sprintf(buf, "%02d:%02d:%02d", hh, mm, ss);
-    epd.drawString(imageBuffer, 5, 30, buf, EPD_2IN13G_RED);
+    // Aggiorna timer solo se cambiato
+    if (hh != lastHH || mm != lastMM || ss != lastSS) {
+        char buf[16];
+        sprintf(buf, "%02d:%02d:%02d", hh, mm, ss);
+        
+        // Cancella area timer
+        tft.fillRect(20, 25, 96, 16, COLOR_BG);
+        
+        // Ridisegna timer
+        tft.setTextColor(COLOR_TIMER);
+        tft.setTextSize(2);
+        tft.setCursor(20, 25);
+        tft.println(buf);
+        
+        lastHH = hh; lastMM = mm; lastSS = ss;
+    }
     
-    // Menu options
-    int y[5] = {60, 80, 100, 120, 140};
-    const char* labels[5] = {"hh", "mm", "ss", running ? "Pause" : "Play", "Reset"};
-    
-    for (int i = 0; i < 5; ++i) {
-        if (cursor == i) {
-            // Evidenzia selezione con rettangolo giallo
-            epd.drawRectangle(imageBuffer, 3, y[i] - 2, 60, y[i] + 12, EPD_2IN13G_YELLOW, true);
-            epd.drawString(imageBuffer, 5, y[i], labels[i], EPD_2IN13G_BLACK);
-        } else {
-            epd.drawString(imageBuffer, 5, y[i], labels[i], EPD_2IN13G_BLACK);
+    // Menu items - ridisegna solo se cursore o editing è cambiato
+    if (cursor != lastCursor || editing != lastEditing || running != lastRunning || firstDraw) {
+        const char* labels[5] = {"HH", "MM", "SS", "START", "RESET"};
+        
+        // Aggiorna label START/PAUSE
+        if (running) {
+            labels[3] = "PAUSE";
         }
+        
+        tft.setTextSize(1);
+        
+        // Ridisegna tutte le voci
+        for (int i = 0; i < 5; i++) {
+            int itemY = 55 + (i * 14);
+            bool isSelected = (i == cursor);
+            
+            // Cancella l'area
+            tft.fillRect(5, itemY - 2, 60, 12, COLOR_BG);
+            
+            if (isSelected) {
+                // Evidenzia con sfondo colorato
+                if (editing && i < 3) {
+                    // In modalità editing usa sfondo rosso
+                    tft.fillRect(5, itemY - 2, 60, 12, COLOR_EDITING);
+                    tft.setTextColor(COLOR_BG);
+                } else {
+                    // Selezione normale con sfondo giallo
+                    tft.fillRect(5, itemY - 2, 60, 12, COLOR_HIGHLIGHT);
+                    tft.setTextColor(COLOR_BG);
+                }
+            } else {
+                tft.setTextColor(COLOR_TEXT);
+            }
+            
+            tft.setCursor(10, itemY);
+            tft.println(labels[i]);
+        }
+        
+        lastCursor = cursor;
+        lastEditing = editing;
     }
     
-    // Status
-    if (finished) {
-        epd.drawString(imageBuffer, 5, 170, "FINE", EPD_2IN13G_RED);
-    } else if (running) {
-        epd.drawString(imageBuffer, 5, 170, "RUN", EPD_2IN13G_BLACK);
-    } else {
-        epd.drawString(imageBuffer, 5, 170, "STOP", EPD_2IN13G_BLACK);
+    // Status line - aggiorna solo se cambiato
+    if (running != lastRunning || finished != lastFinished) {
+        int yPos = 115;
+        
+        // Cancella area status
+        tft.fillRect(90, yPos, 70, 10, COLOR_BG);
+        
+        tft.setTextSize(1);
+        if (finished) {
+            tft.setTextColor(COLOR_EDITING);
+            tft.setCursor(90, yPos);
+            tft.println("FINISHED!");
+        } else if (running) {
+            tft.setTextColor(COLOR_TEXT);
+            tft.setCursor(90, yPos);
+            tft.println("Running...");
+        } else {
+            tft.setTextColor(COLOR_TEXT);
+            tft.setCursor(90, yPos);
+            tft.println("Stopped");
+        }
+        
+        lastRunning = running;
+        lastFinished = finished;
     }
-    
-    // Aggiorna display
-    epd.display(imageBuffer);
 }
-
-*/
