@@ -5,36 +5,42 @@
 #include "Output.h"
 #include "EinkDisplay.h"
 
-// Pin liberi sul D1 Mini (non in conflitto con SPI del display TFT)
-// Display usa: D3(DC), D4(RST), D5(SCK), D7(MOSI), D8(CS)
-// SPI usa anche: D6(MISO/GPIO12) - forzato LOW, usiamo come OUTPUT
-// Encoder: polling completo
-#define ENCODER_PIN_A D1  // GPIO5  - DT
-#define ENCODER_PIN_B D2  // GPIO4  - CLK
-#define ENCODER_BTN   D0  // GPIO16 - SW (polling)
-#define OUTPUT_PIN    D6  // GPIO12 (MISO come OUTPUT)
+// ===== CONFIGURAZIONE FINALE PIN ESP8266 D1 Mini =====
+// Display SPI: TX(RST), RX(CS), D2(DC), D5(SCK), D7(MOSI)
+// Encoder: D0(BTN), D1(DT), D6(CLK)
+// Output: D3(TIMER), D4(TEMP_CTRL), D8(LED)
+// Input: A0(NTC)
+// NOTA: Serial debug DISABILITATO (TX/RX usati per display)
+#define ENCODER_PIN_A D1  // GPIO5  - DT (LIBERO!)
+#define ENCODER_PIN_B D6  // GPIO12 - CLK (MISO libero)
+#define ENCODER_BTN   D0  // GPIO16 - SW (LIBERO!)
+#define OUTPUT_PIN_1  D3  // GPIO0  - TIMER
+#define OUTPUT_PIN_2  D4  // GPIO2  - TEMP CTRL
+#define LED_PIN       D8  // GPIO15 - LED extra
+#define INPUT_NTC     A0  // ADC    - NTC (futuro)
+#define INPUT_NTC     A0  // ADC   - NTC (futuro)
 
 void setup() {
-    Serial.begin(115200);
+    // Serial.begin(115200);  // DISABILITATO: TX/RX usati per display
     delay(1000);
-    Serial.println("\n\n=== Sleepy Timer Starting ===");
+    // Serial.println("\n\n=== Sleepy Timer Starting ===");
     
-    Serial.println("Init encoder...");
+    // Serial.println("Init encoder...");
     encoder_init(ENCODER_PIN_A, ENCODER_PIN_B, ENCODER_BTN);
     
-    Serial.println("Init menu...");
+    // Serial.println("Init menu...");
     menu_init();
     
-    Serial.println("Init timer...");
+    // Serial.println("Init timer...");
     timer_init();
     
-    Serial.println("Init output...");
-    output_init(OUTPUT_PIN);
+    // Serial.println("Init output...");
+    output_init(OUTPUT_PIN_1);
     
-    Serial.println("Init TFT display...");
+    // Serial.println("Init TFT display...");
     eink_init();
     
-    Serial.println("Setup complete!");
+    // Serial.println("Setup complete!");
 }
 
 void loop() {
@@ -103,7 +109,7 @@ void loop() {
 
     // Aggiorna display solo se necessario
     if (needsUpdate) {
-        Serial.println("*** Display update triggered ***");
+        // Serial.println("*** Display update triggered ***");
         drawMenu(cursor, editing, hh, mm, ss, running, finished);
     }
 

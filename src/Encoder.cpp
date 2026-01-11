@@ -88,20 +88,20 @@ void encoder_init(uint8_t a, uint8_t b, uint8_t btn) {
     pinMode(pinB, INPUT_PULLUP);
     pinMode(btnPin, INPUT_PULLUP);
     
-    Serial.print("Encoder: pinA=");
-    Serial.print(pinA);
-    Serial.print(" pinB=");
-    Serial.print(pinB);
-    Serial.print(" btn=");
-    Serial.println(btnPin);
+    // Serial.print("Encoder: pinA=");
+    // Serial.print(pinA);
+    // Serial.print(" pinB=");
+    // Serial.print(pinB);
+    // Serial.print(" btn=");
+    // Serial.println(btnPin);
     
     // Inizializza lo stato
     delay(100);
     state = 0x03; // Start state
-    Serial.print("Encoder: Initial pinstate=");
-    Serial.println((digitalRead(pinA) << 1) | digitalRead(pinB), BIN);
+    // Serial.print("Encoder: Initial pinstate=");
+    // Serial.println((digitalRead(pinA) << 1) | digitalRead(pinB), BIN);
     
-    Serial.println("Encoder: Full polling mode (D0 doesn't support interrupts)");
+    // Serial.println("Encoder: Full polling mode (D0 doesn't support interrupts)");
 }
 
 void encoder_update() {
@@ -128,12 +128,12 @@ void encoder_update() {
                 encoderDir = 1;
                 encoderPos++;
                 encoderMoved = true;
-                Serial.println("CW");
+                // Serial.println("CW");
             } else {
                 encoderDir = -1;
                 encoderPos--;
                 encoderMoved = true;
-                Serial.println("CCW");
+                // Serial.println("CCW");
             }
         }
     }
@@ -156,7 +156,7 @@ void encoder_update() {
     if (btnState == LOW && !btnEventSent && (millis() - lastBtnChange) > 50) {
         encoderBtnPressed = true;
         btnEventSent = true; // Blocca ulteriori eventi finché non viene rilasciato
-        Serial.println("BTN");
+        // Serial.println("BTN");
     }
 }
 

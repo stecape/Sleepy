@@ -4,12 +4,28 @@
 #include <SPI.h>
 
 // Pin definitions per ESP8266 D1 Mini
-// Puoi modificare questi pin secondo il tuo collegamento
-#define TFT_CS     D8  // Chip select
-#define TFT_RST    D4  // Reset
-#define TFT_DC     D3  // Data/Command
+// Configurazione FINALE con TX/RX come GPIO:
+// - CS: RX (GPIO3) - Chip Select
+// - RST: TX (GPIO1) - Reset
+// - DC: D2 (GPIO4) - Data/Command
+// - SCK: D5 (GPIO14) - SPI hardware SCK
+// - MOSI: D7 (GPIO13) - SPI hardware MOSI
+// - LED: resistenza 5k + VCC (sempre acceso)
+// 
+// Cablaggio display:
+// Pin3 SCK → D5
+// Pin4 MOSI → D7
+// Pin5 RES → TX
+// Pin6 DC → D2
+// Pin7 CS → RX
+// Pin8 LED → 5k + VCC
+// 
+// NOTA: Serial debug DISABILITATO (TX/RX usati come GPIO)
+#define TFT_CS     RX  // Chip Select - GPIO3 (pin RX)
+#define TFT_RST    TX  // Reset - GPIO1 (pin TX)
+#define TFT_DC     D2  // Data/Command - GPIO4
 
-// Display object
+// Display object - Costruttore SPI hardware: (CS, DC, RST)
 static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
 // Colori per il display TFT
@@ -20,17 +36,24 @@ static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 #define COLOR_TIMER     ST77XX_CYAN
 
 void eink_init() {
-    Serial.println("Display: Initializing TFT ST7735...");
+    // Serial.println("Display: Initializing TFT ST7735...");
+    
+    // LED retroilluminazione gestita esternamente (5k + VCC)
+    // Serial.println("Display: LED on external circuit");
     
     // Inizializza il display
-    // Usa INITR_BLACKTAB per la maggior parte dei display 1.77" 128x160
-    // Se il display mostra colori strani, prova INITR_GREENTAB o INITR_REDTAB
+    // Serial.println("Display: Calling initR()...");
     tft.initR(INITR_BLACKTAB);
+    // Serial.println("Display: initR() complete");
     
-    Serial.println("Display: Setting rotation...");
+    // Serial.println("Display: Setting rotation...");
     tft.setRotation(3); // Landscape mode invertito (160x128)
     
-    Serial.println("Display: Clearing screen...");
+    // Serial.println("Display: Clearing screen...");
+    tft.fillScreen(ST77XX_RED);  // Prova con rosso per vedere se cambia qualcosa
+    delay(1000);
+    tft.fillScreen(ST77XX_GREEN);
+    delay(1000);
     tft.fillScreen(COLOR_BG);
     
     // Schermata iniziale
@@ -48,7 +71,7 @@ void eink_init() {
     
     delay(1000);
     
-    Serial.println("Display: Initialization complete!");
+    // Serial.println("Display: Initialization complete!");
 }
 
 void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bool finished) {

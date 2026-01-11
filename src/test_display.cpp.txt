@@ -1,0 +1,44 @@
+// Test display ST7735 - Esempio minimo Adafruit
+// Rinomina in main.cpp per testare
+#include <Arduino.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ST7735.h>
+#include <SPI.h>
+
+#define TFT_CS   D3  // GPIO0
+#define TFT_RST  D4  // GPIO2 
+#define TFT_DC   D6  // GPIO12
+
+Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+
+void setup() {
+  Serial.begin(115200);
+  delay(2000);
+  Serial.println("ST7735 Test!");
+  
+  // Inizializzazione
+  tft.initR(INITR_BLACKTAB);
+  Serial.println("Initialized");
+  
+  tft.fillScreen(ST77XX_BLACK);
+  delay(500);
+  
+  tft.fillScreen(ST77XX_RED);
+  Serial.println("RED");
+  delay(1000);
+  
+  tft.fillScreen(ST77XX_GREEN);
+  Serial.println("GREEN");
+  delay(1000);
+  
+  tft.fillScreen(ST77XX_BLUE);
+  Serial.println("BLUE");
+  delay(1000);
+  
+  tft.fillScreen(ST77XX_WHITE);
+  Serial.println("WHITE");
+}
+
+void loop() {
+  // Niente
+}
