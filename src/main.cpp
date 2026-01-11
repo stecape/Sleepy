@@ -5,18 +5,18 @@
 #include "Output.h"
 #include "EinkDisplay.h"
 
-// ===== CONFIGURAZIONE FINALE PIN ESP8266 D1 Mini =====
-// Display SPI: TX(RST), RX(CS), D2(DC), D5(SCK), D7(MOSI)
-// Encoder: D0(BTN), D1(DT), D6(CLK)
-// Output: D3(TIMER), D4(TEMP_CTRL), D8(LED)
-// Input: A0(NTC)
+// ===== CONFIGURAZIONE FINALE OTTIMIZZATA =====
+// Display SPI: TX(RST), RX(CS), D8(DC), D5(SCK), D7(MOSI)
+// Encoder: D0(BTN), D1(DT), D2(CLK) ✓✓✓
+// Output: D3(TIMER), D4(TEMP_CTRL), D6(extra) ✓✓✓
+// Input: A0(NTC) ✓
 // NOTA: Serial debug DISABILITATO (TX/RX usati per display)
-#define ENCODER_PIN_A D1  // GPIO5  - DT (LIBERO!)
-#define ENCODER_PIN_B D6  // GPIO12 - CLK (MISO libero)
-#define ENCODER_BTN   D0  // GPIO16 - SW (LIBERO!)
+#define ENCODER_PIN_A D1  // GPIO5  - DT
+#define ENCODER_PIN_B D2  // GPIO4  - CLK
+#define ENCODER_BTN   D0  // GPIO16 - SW
 #define OUTPUT_PIN_1  D3  // GPIO0  - TIMER
 #define OUTPUT_PIN_2  D4  // GPIO2  - TEMP CTRL
-#define LED_PIN       D8  // GPIO15 - LED extra
+#define OUTPUT_PIN_3  D6  // GPIO12 - LED/Extra output
 #define INPUT_NTC     A0  // ADC    - NTC (futuro)
 #define INPUT_NTC     A0  // ADC   - NTC (futuro)
 
@@ -36,6 +36,10 @@ void setup() {
     
     // Serial.println("Init output...");
     output_init(OUTPUT_PIN_1);
+    
+    // Test D6 come output LED
+    pinMode(OUTPUT_PIN_3, OUTPUT);
+    digitalWrite(OUTPUT_PIN_3, HIGH);  // Accende LED su D6
     
     // Serial.println("Init TFT display...");
     eink_init();

@@ -4,10 +4,10 @@
 #include <SPI.h>
 
 // Pin definitions per ESP8266 D1 Mini
-// Configurazione FINALE con TX/RX come GPIO:
+// CONFIGURAZIONE FINALE FUNZIONANTE:
 // - CS: RX (GPIO3) - Chip Select
 // - RST: TX (GPIO1) - Reset
-// - DC: D2 (GPIO4) - Data/Command
+// - DC: D8 (GPIO15) - Data/Command ✓ FUNZIONA!
 // - SCK: D5 (GPIO14) - SPI hardware SCK
 // - MOSI: D7 (GPIO13) - SPI hardware MOSI
 // - LED: resistenza 5k + VCC (sempre acceso)
@@ -16,14 +16,14 @@
 // Pin3 SCK → D5
 // Pin4 MOSI → D7
 // Pin5 RES → TX
-// Pin6 DC → D2
+// Pin6 DC → D8
 // Pin7 CS → RX
 // Pin8 LED → 5k + VCC
 // 
 // NOTA: Serial debug DISABILITATO (TX/RX usati come GPIO)
 #define TFT_CS     RX  // Chip Select - GPIO3 (pin RX)
 #define TFT_RST    TX  // Reset - GPIO1 (pin TX)
-#define TFT_DC     D2  // Data/Command - GPIO4
+#define TFT_DC     D8  // Data/Command - GPIO15
 
 // Display object - Costruttore SPI hardware: (CS, DC, RST)
 static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
