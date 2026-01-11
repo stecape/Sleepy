@@ -4,29 +4,32 @@
 #include <SPI.h>
 
 // Pin definitions per ESP8266 D1 Mini
-// CONFIGURAZIONE FINALE FUNZIONANTE:
+// CONFIGURAZIONE con SPI SOFTWARE:
 // - CS: RX (GPIO3) - Chip Select
 // - RST: TX (GPIO1) - Reset
-// - DC: D8 (GPIO15) - Data/Command ✓ FUNZIONA!
-// - SCK: D5 (GPIO14) - SPI hardware SCK
-// - MOSI: D7 (GPIO13) - SPI hardware MOSI
+// - DC: D6 (GPIO12) - Data/Command
+// - SCK: D5 (GPIO14) - SCK (software)
+// - MOSI: D7 (GPIO13) - MOSI (software)
 // - LED: resistenza 5k + VCC (sempre acceso)
 // 
-// Cablaggio display:
+// Cablaggio display (INVARIATO):
 // Pin3 SCK → D5
 // Pin4 MOSI → D7
 // Pin5 RES → TX
-// Pin6 DC → D8
+// Pin6 DC → D6
 // Pin7 CS → RX
 // Pin8 LED → 5k + VCC
 // 
-// NOTA: Serial debug DISABILITATO (TX/RX usati come GPIO)
+// NOTA: SPI SOFTWARE per liberare D6 (MISO)
 #define TFT_CS     RX  // Chip Select - GPIO3 (pin RX)
 #define TFT_RST    TX  // Reset - GPIO1 (pin TX)
-#define TFT_DC     D8  // Data/Command - GPIO15
+#define TFT_DC     D6  // Data/Command - GPIO12
+#define TFT_MOSI   D7  // MOSI - GPIO13 (software)
+#define TFT_SCK    D5  // SCK - GPIO14 (software)
+#define TFT_LED    D8  // LED backlight - GPIO15
 
-// Display object - Costruttore SPI hardware: (CS, DC, RST)
-static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
+// Display object - Costruttore SPI software: (CS, DC, MOSI, SCLK, RST)
+static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCK, TFT_RST);
 
 // Colori per il display TFT
 #define COLOR_BG        ST77XX_BLACK
@@ -38,8 +41,10 @@ static Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 void eink_init() {
     // Serial.println("Display: Initializing TFT ST7735...");
     
-    // LED retroilluminazione gestita esternamente (5k + VCC)
-    // Serial.println("Display: LED on external circuit");
+    // Inizializza LED backlight
+    pinMode(TFT_LED, OUTPUT);
+    digitalWrite(TFT_LED, HIGH);  // Accendi backlight
+    // Serial.println("Display: LED backlight ON");
     
     // Inizializza il display
     // Serial.println("Display: Calling initR()...");
@@ -179,4 +184,12 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
         lastRunning = running;
         lastFinished = finished;
     }
+}
+
+void eink_backlight_on() {
+    digitalWrite(TFT_LED, HIGH);
+}
+
+void eink_backlight_off() {
+    digitalWrite(TFT_LED, LOW);
 }
