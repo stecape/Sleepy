@@ -6,9 +6,9 @@
 #include "EinkDisplay.h"
 
 // ===== CONFIGURAZIONE con SPI SOFTWARE =====
-// Display SPI: TX(RST), RX(CS), D6(DC), D5(SCK), D7(MOSI) - SOFTWARE
+// Display SPI: TX(SCK), RX(MOSI), D5(RES), D6(DC), D7(CS), D8(LED) - SOFTWARE
 // Encoder: D0(BTN), D1(DT), D2(CLK) ✓✓✓
-// Output: D3(TIMER), D4(TEMP_CTRL), D8(LED) ✓✓✓
+// Output: D3(TIMER), D4(TEMP_CTRL) ✓✓
 // Input: A0(NTC) ✓
 // NOTA: Serial debug DISABILITATO (TX/RX usati per display)
 #define ENCODER_PIN_A D1  // GPIO5  - DT

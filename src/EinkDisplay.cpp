@@ -5,27 +5,27 @@
 
 // Pin definitions per ESP8266 D1 Mini
 // CONFIGURAZIONE con SPI SOFTWARE:
-// - CS: RX (GPIO3) - Chip Select
-// - RST: TX (GPIO1) - Reset
+// - CS: D7 (GPIO13) - Chip Select
+// - RST: D5 (GPIO14) - Reset
 // - DC: D6 (GPIO12) - Data/Command
-// - SCK: D5 (GPIO14) - SCK (software)
-// - MOSI: D7 (GPIO13) - MOSI (software)
+// - SCK: TX (GPIO1) - SCK (software)
+// - MOSI: RX (GPIO3) - MOSI (software)
 // - LED: resistenza 5k + VCC (sempre acceso)
 // 
-// Cablaggio display (INVARIATO):
-// Pin3 SCK → D5
-// Pin4 MOSI → D7
-// Pin5 RES → TX
+// Cablaggio display:
+// Pin3 SCK → TX
+// Pin4 MOSI → RX
+// Pin5 RES → D5
 // Pin6 DC → D6
-// Pin7 CS → RX
-// Pin8 LED → 5k + VCC
+// Pin7 CS → D7
+// Pin8 LED → D8 (MPS A14 Darlington)
 // 
-// NOTA: SPI SOFTWARE per liberare D6 (MISO)
-#define TFT_CS     RX  // Chip Select - GPIO3 (pin RX)
-#define TFT_RST    TX  // Reset - GPIO1 (pin TX)
+// NOTA: SPI SOFTWARE
+#define TFT_CS     D7  // Chip Select - GPIO13
+#define TFT_RST    D5  // Reset - GPIO14
 #define TFT_DC     D6  // Data/Command - GPIO12
-#define TFT_MOSI   D7  // MOSI - GPIO13 (software)
-#define TFT_SCK    D5  // SCK - GPIO14 (software)
+#define TFT_MOSI   RX  // MOSI - GPIO3 (software)
+#define TFT_SCK    TX  // SCK - GPIO1 (software)
 #define TFT_LED    D8  // LED backlight - GPIO15
 
 // Display object - Costruttore SPI software: (CS, DC, MOSI, SCLK, RST)
