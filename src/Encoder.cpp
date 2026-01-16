@@ -4,7 +4,11 @@ static volatile int encoderPos = 0;
 static volatile bool encoderMoved = false;
 static volatile int encoderDir = 0;
 static volatile bool encoderBtnPressed = false;
+static volatile bool encoderLongPressed = false;
+static volatile unsigned long btnPressTime = 0;
 static uint8_t pinA, pinB, btnPin;
+
+#define LONG_PRESS_MS 800  // 800ms for long press
 
 // KY-040 State machine - HALF-STEP version (più comune per KY-040)
 #define DIR_NONE 0x00
@@ -113,7 +117,6 @@ void encoder_update() {
     lastRead = now;
     
     static uint8_t lastA = HIGH;
-    static uint8_t lastB = HIGH;
     
     uint8_t currentA = digitalRead(pinA);
     uint8_t currentB = digitalRead(pinB);
@@ -138,25 +141,42 @@ void encoder_update() {
         }
     }
     
-    lastB = currentB;
-    
-    // Polling del pulsante - solo fronte di discesa
+    // Polling del pulsante - con supporto long press
     static bool lastBtn = HIGH;
     static unsigned long lastBtnChange = 0;
     static bool btnEventSent = false;
+    static bool longPressDetected = false;
     bool btnState = digitalRead(btnPin);
     
     if (btnState != lastBtn) {
         lastBtnChange = millis();
         lastBtn = btnState;
-        btnEventSent = false; // Reset quando cambia stato
+        
+        if (btnState == LOW) {
+            // Button pressed - start timing
+            btnPressTime = millis();
+            btnEventSent = false;
+            longPressDetected = false;
+        } else if (btnState == HIGH) {
+            // Button released - check press duration
+            unsigned long pressDuration = millis() - btnPressTime;
+            if (!longPressDetected && !btnEventSent && pressDuration > 50 && pressDuration < LONG_PRESS_MS) {
+                // Short click (debounced and not a long press)
+                encoderBtnPressed = true;
+                btnEventSent = true;
+            }
+            longPressDetected = false;
+        }
     }
     
-    // Rileva SOLO la pressione (fronte di discesa) dopo debounce
-    if (btnState == LOW && !btnEventSent && (millis() - lastBtnChange) > 50) {
-        encoderBtnPressed = true;
-        btnEventSent = true; // Blocca ulteriori eventi finché non viene rilasciato
-        // Serial.println("BTN");
+    // Check for long press while button is held
+    if (btnState == LOW && !longPressDetected) {
+        if ((millis() - btnPressTime) >= LONG_PRESS_MS) {
+            encoderLongPressed = true;
+            longPressDetected = true;
+            btnEventSent = true;  // Prevent short click on release
+            // Serial.println("LONG PRESS");
+        }
     }
 }
 
@@ -172,8 +192,13 @@ bool encoder_was_clicked() {
     return encoderBtnPressed;
 }
 
+bool encoder_was_long_pressed() {
+    return encoderLongPressed;
+}
+
 void encoder_reset_flags() {
     encoderMoved = false;
     encoderBtnPressed = false;
+    encoderLongPressed = false;
     encoderDir = 0;
 }

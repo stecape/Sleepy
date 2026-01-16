@@ -64,19 +64,73 @@ void eink_init() {
     // Schermata iniziale
     tft.setTextColor(COLOR_TEXT);
     tft.setTextSize(2);
-    tft.setCursor(20, 40);
-    tft.println("Sleepy");
-    tft.setCursor(20, 60);
-    tft.println("Timer");
+    tft.setCursor(10, 30);
+    tft.println("Ciao, Pa'!");
     
-    tft.setTextColor(COLOR_EDITING);
-    tft.setTextSize(1);
-    tft.setCursor(20, 90);
-    tft.println("Ready!");
+    // Disegna smile con forme geometriche
+    int centerX = 80;
+    int centerY = 85;
     
-    delay(1000);
+    // Faccia - cerchio giallo
+    tft.drawCircle(centerX, centerY, 30, COLOR_HIGHLIGHT);
+    tft.drawCircle(centerX, centerY, 29, COLOR_HIGHLIGHT);
+    
+    // Occhi - cerchi pieni gialli
+    tft.fillCircle(centerX - 10, centerY - 8, 4, COLOR_HIGHLIGHT);
+    tft.fillCircle(centerX + 10, centerY - 8, 4, COLOR_HIGHLIGHT);
+    
+    // Bocca sorridente - arco fatto con pixel (parabola verso l'alto!)
+    for (int i = -12; i <= 12; i++) {
+        int y = centerY + 15 - (i * i) / 30;  // Invertito per sorridere!
+        tft.drawPixel(centerX + i, y, COLOR_HIGHLIGHT);
+        tft.drawPixel(centerX + i, y + 1, COLOR_HIGHLIGHT);
+    }
+    
+    delay(3000);
     
     // Serial.println("Display: Initialization complete!");
+}
+
+void drawHeader(PageType currentPage) {
+    // Draw header with two buttons: TIMER | HEATING
+    tft.fillRect(0, 0, 160, 20, COLOR_BG);
+    
+    tft.setTextSize(1);
+    
+    // TIMER button (left half)
+    if (currentPage == PAGE_TIMER) {
+        tft.fillRect(0, 0, 80, 20, COLOR_HIGHLIGHT);
+        tft.setTextColor(COLOR_BG);
+    } else {
+        tft.setTextColor(COLOR_TEXT);
+    }
+    tft.setCursor(20, 6);
+    tft.println("TIMER");
+    
+    // Separator
+    tft.drawFastVLine(80, 0, 20, COLOR_TEXT);
+    
+    // HEATING button (right half)
+    if (currentPage == PAGE_HEATING) {
+        tft.fillRect(81, 0, 79, 20, COLOR_HIGHLIGHT);
+        tft.setTextColor(COLOR_BG);
+    } else {
+        tft.setTextColor(COLOR_TEXT);
+    }
+    tft.setCursor(90, 6);
+    tft.println("HEATING");
+    
+    // Bottom border
+    tft.drawFastHLine(0, 20, 160, COLOR_TEXT);
+}
+
+// Static flags for forcing redraw
+static bool forceTimerRedraw = true;
+static bool forceHeatingRedraw = true;
+
+void eink_force_redraw() {
+    forceTimerRedraw = true;
+    forceHeatingRedraw = true;
 }
 
 void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bool finished) {
@@ -85,19 +139,16 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
     static int lastHH = -1, lastMM = -1, lastSS = -1;
     static bool lastRunning = false;
     static bool lastFinished = false;
-    static bool firstDraw = true;
     
-    // Prima volta ridisegna tutto
-    if (firstDraw) {
+    // Prima volta o dopo cambio pagina, ridisegna tutto
+    if (forceTimerRedraw) {
         tft.fillScreen(COLOR_BG);
-        
-        // Titolo
-        tft.setTextColor(COLOR_TEXT);
-        tft.setTextSize(1);
-        tft.setCursor(5, 5);
-        tft.println("TIMER");
-        
-        firstDraw = false;
+        drawHeader(PAGE_TIMER);
+        forceTimerRedraw = false;
+        lastCursor = -1;
+        lastEditing = false;
+        lastHH = lastMM = lastSS = -1;
+        lastRunning = lastFinished = false;
     }
     
     // Aggiorna timer solo se cambiato
@@ -118,7 +169,7 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
     }
     
     // Menu items - ridisegna solo se cursore o editing è cambiato
-    if (cursor != lastCursor || editing != lastEditing || running != lastRunning || firstDraw) {
+    if (cursor != lastCursor || editing != lastEditing || running != lastRunning) {
         const char* labels[5] = {"HH", "MM", "SS", "START", "RESET"};
         
         // Aggiorna label START/PAUSE
@@ -184,6 +235,132 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
         lastRunning = running;
         lastFinished = finished;
     }
+}
+
+void drawHeatingPage(int cursor, bool editing, float setpoint, float actual, bool enabled, float output) {
+    static int lastCursor = -1;
+    static bool lastEditing = false;
+    static float lastSetpoint = -999;
+    static float lastActual = -999;
+    static bool lastEnabled = false;
+    static float lastOutput = -999;
+    
+    // Prima volta o dopo cambio pagina, ridisegna tutto
+    if (forceHeatingRedraw) {
+        tft.fillScreen(COLOR_BG);
+        drawHeader(PAGE_HEATING);
+        
+        // Labels
+        tft.setTextColor(COLOR_TEXT);
+        tft.setTextSize(1);
+        tft.setCursor(5, 30);
+        tft.println("Setpoint:");
+        tft.setCursor(5, 55);
+        tft.println("Actual:");
+        tft.setCursor(5, 80);
+        tft.println("Output:");
+        
+        forceHeatingRedraw = false;
+        lastCursor = -1;
+        lastEditing = false;
+        lastSetpoint = lastActual = lastOutput = -999;
+        lastEnabled = false;
+    }
+    
+    // Update setpoint if changed
+    if (setpoint != lastSetpoint || cursor != lastCursor || editing != lastEditing) {
+        char buf[16];
+        sprintf(buf, "%.1f", setpoint);
+        
+        // Clear area (larger for bigger text)
+        tft.fillRect(70, 26, 70, 18, COLOR_BG);
+        
+        // Highlight if selected
+        if (cursor == 0) {
+            if (editing) {
+                tft.fillRect(70, 26, 70, 18, COLOR_EDITING);
+                tft.setTextColor(COLOR_TEXT);  // White text on red background
+            } else {
+                tft.fillRect(70, 26, 70, 18, COLOR_HIGHLIGHT);
+                tft.setTextColor(COLOR_BG);
+            }
+        } else {
+            tft.setTextColor(COLOR_TIMER);
+        }
+        
+        tft.setTextSize(2);  // Larger text
+        tft.setCursor(72, 28);
+        tft.print(buf);
+        tft.setTextSize(1);
+        tft.print("C");
+        
+        lastSetpoint = setpoint;
+    }
+    
+    // Update actual temperature if changed
+    if (actual != lastActual) {
+        char buf[16];
+        sprintf(buf, "%.1f", actual);
+        
+        // Clear area (larger for bigger text)
+        tft.fillRect(70, 51, 70, 18, COLOR_BG);
+        
+        tft.setTextColor(COLOR_TIMER);
+        tft.setTextSize(2);  // Larger text
+        tft.setCursor(72, 53);
+        tft.print(buf);
+        tft.setTextSize(1);
+        tft.print("C");
+        
+        lastActual = actual;
+    }
+    
+    // Update output percentage if changed
+    if (output != lastOutput || enabled != lastEnabled) {
+        char buf[16];
+        sprintf(buf, "%.0f", output);
+        
+        // Clear area (larger for bigger text)
+        tft.fillRect(70, 76, 70, 18, COLOR_BG);
+        
+        if (enabled && output > 0) {
+            tft.setTextColor(COLOR_EDITING);  // Red when active
+        } else {
+            tft.setTextColor(COLOR_TEXT);
+        }
+        tft.setTextSize(2);  // Larger text
+        tft.setCursor(72, 78);
+        tft.print(buf);
+        tft.setTextSize(1);
+        tft.print("%");
+        
+        lastOutput = output;
+    }
+    
+    // Enable/Disable button
+    if (enabled != lastEnabled || cursor != lastCursor) {
+        int itemY = 105;
+        const char* label = enabled ? "DISABLE" : "ENABLE";
+        
+        // Clear area
+        tft.fillRect(5, itemY - 2, 70, 12, COLOR_BG);
+        
+        if (cursor == 1) {
+            tft.fillRect(5, itemY - 2, 70, 12, COLOR_HIGHLIGHT);
+            tft.setTextColor(COLOR_BG);
+        } else {
+            tft.setTextColor(COLOR_TEXT);
+        }
+        
+        tft.setTextSize(1);
+        tft.setCursor(10, itemY);
+        tft.println(label);
+        
+        lastEnabled = enabled;
+    }
+    
+    lastCursor = cursor;
+    lastEditing = editing;
 }
 
 void eink_backlight_on() {

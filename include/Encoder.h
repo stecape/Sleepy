@@ -7,4 +7,5 @@ void encoder_update();
 int encoder_get_direction();
 bool encoder_was_moved();
 bool encoder_was_clicked();
+bool encoder_was_long_pressed();  // New: detect long press
 void encoder_reset_flags();

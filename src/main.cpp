@@ -4,6 +4,8 @@
 #include "Timer.h"
 #include "Output.h"
 #include "EinkDisplay.h"
+#include "TemperatureController.h"
+#include "NTCReader.h"
 
 // ===== CONFIGURAZIONE con SPI SOFTWARE =====
 // Display SPI: TX(SCK), RX(MOSI), D5(RES), D6(DC), D7(CS), D8(LED) - SOFTWARE
@@ -19,6 +21,10 @@
 #define OUTPUT_PIN_3  D8  // GPIO15 - LED/Extra output
 #define INPUT_NTC     A0  // ADC    - NTC (futuro)
 #define INPUT_NTC     A0  // ADC   - NTC (futuro)
+
+// Global objects
+TemperatureController tempController(OUTPUT_PIN_2);
+NTCReader ntcReader(INPUT_NTC);
 
 void setup() {
     // Serial.begin(115200);  // DISABILITATO: TX/RX usati per display
@@ -40,6 +46,15 @@ void setup() {
     // Serial.println("Init TFT display...");
     eink_init();
     
+    // Initialize temperature controller with default parameters
+    // These can be tuned later
+    tempController.setPIDParameters(10.0, 0.5, 5.0);
+    tempController.setOutputLimits(0.0, 100.0);
+    
+    // Initialize NTC reader with typical 10k NTC parameters
+    // Beta = 3950, R0 = 10k at 25°C, Series resistor = 10k
+    ntcReader.setNTCParameters(10000.0, 25.0, 3950.0, 10000.0);
+    
     // Serial.println("Setup complete!");
 }
 
@@ -50,25 +65,91 @@ void loop() {
     static bool lastEditing = false;
     static bool lastRunning = false;
     static bool lastFinished = false;
+    static PageType lastPage = PAGE_TIMER;
+    
+    // Temperature control variables
+    static float tempSetpoint = 25.0;
+    static float tempActual = 22.5;
+    static bool tempEnabled = false;
+    static unsigned long lastTempRead = 0;
+    static unsigned long lastTempUpdate = 0;
+    static float lastTempSetpoint = -999.0;  // Track for display updates
     
     encoder_update();
     if (encoder_was_moved()) {
         int dir = -encoder_get_direction(); // Inverti direzione per logica menu
         
         if (menu_is_editing()) {
-            menu_edit_field(dir);
+            // Check which page we're on
+            PageType currentPage = menu_get_current_page();
+            if (currentPage == PAGE_HEATING) {
+                // Edit heating page fields
+                int cursor = menu_get_cursor();
+                if (cursor == 0) {  // Setpoint
+                    tempSetpoint += dir * 0.5;
+                    if (tempSetpoint < 10.0) tempSetpoint = 10.0;
+                    if (tempSetpoint > 50.0) tempSetpoint = 50.0;
+                }
+            } else {
+                menu_edit_field(dir);
+            }
         } else {
             menu_move_cursor(dir);
         }
         needsUpdate = true;
     }
-    if (encoder_was_clicked()) {
-        menu_handle_click();
+    
+    if (encoder_was_long_pressed()) {
+        // Long press: switch page
+        PageType currentPage = menu_get_current_page();
+        if (currentPage == PAGE_TIMER) {
+            menu_set_page(PAGE_HEATING);
+        } else {
+            menu_set_page(PAGE_TIMER);
+        }
+        needsUpdate = true;
+    } else if (encoder_was_clicked()) {
+        // Normal click: handle menu actions
+        PageType currentPage = menu_get_current_page();
+        if (currentPage == PAGE_HEATING) {
+            int cursor = menu_get_cursor();
+            if (cursor == 0) {  // Setpoint field
+                menu_handle_click();  // Toggle editing
+            } else if (cursor == 1) {  // Enable/Disable button
+                tempEnabled = !tempEnabled;
+                if (tempEnabled) {
+                    tempController.setSetpoint(tempSetpoint);
+                    tempController.enable();
+                } else {
+                    tempController.disable();
+                }
+            }
+        } else {
+            menu_handle_click();
+        }
         needsUpdate = true;
     }
     encoder_reset_flags();
 
     timer_tick();
+    
+    // Read temperature sensor periodically (every 500ms)
+    unsigned long now = millis();
+    if (now - lastTempRead >= 500) {
+        tempActual = ntcReader.readTemperature();
+        lastTempRead = now;
+    }
+    
+    // Update temperature controller (every 100ms for responsive control)
+    if (now - lastTempUpdate >= 100) {
+        tempController.update(tempActual);
+        lastTempUpdate = now;
+        
+        // Update setpoint if changed in editing mode
+        if (tempEnabled) {
+            tempController.setSetpoint(tempSetpoint);
+        }
+    }
 
     // Sincronizza il menu con il timer quando è in esecuzione
     if (timer_is_running()) {
@@ -94,23 +175,32 @@ void loop() {
     bool editing = menu_is_editing();
     bool running = timer_is_running();
     bool finished = timer_is_finished();
+    PageType currentPage = menu_get_current_page();
     
     // Controlla se qualcosa è cambiato
     if (hh != lastHH || mm != lastMM || ss != lastSS ||
         cursor != lastCursor || editing != lastEditing ||
-        running != lastRunning || finished != lastFinished) {
+        running != lastRunning || finished != lastFinished ||
+        currentPage != lastPage || tempSetpoint != lastTempSetpoint) {
         needsUpdate = true;
         lastHH = hh; lastMM = mm; lastSS = ss;
         lastCursor = cursor;
         lastEditing = editing;
         lastRunning = running;
         lastFinished = finished;
+        lastPage = currentPage;
+        lastTempSetpoint = tempSetpoint;
     }
 
     // Aggiorna display solo se necessario
     if (needsUpdate) {
         // Serial.println("*** Display update triggered ***");
-        drawMenu(cursor, editing, hh, mm, ss, running, finished);
+        if (currentPage == PAGE_TIMER) {
+            drawMenu(cursor, editing, hh, mm, ss, running, finished);
+        } else if (currentPage == PAGE_HEATING) {
+            float pidOutput = tempController.getOutput();
+            drawHeatingPage(cursor, editing, tempSetpoint, tempActual, tempEnabled, pidOutput);
+        }
     }
 
     delay(10);
