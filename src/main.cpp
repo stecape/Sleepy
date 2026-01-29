@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ArduinoOTA.h>
 #include "Encoder.h"
 #include "Menu.h"
 #include "Timer.h"
@@ -27,6 +29,33 @@ TemperatureController tempController(OUTPUT_PIN_2);
 NTCReader ntcReader(INPUT_NTC);
 
 void setup() {
+        // --- CONFIGURAZIONE WIFI (modifica SSID e PASSWORD!) ---
+
+    WiFi.mode(WIFI_STA);
+    // Impostazione IP statico
+    IPAddress staticIP(192, 168, 2, 58);
+    IPAddress gateway(192, 168, 2, 1);      // Modifica se il tuo gateway è diverso
+    IPAddress subnet(255, 255, 255, 0);
+    IPAddress dns(8, 8, 8, 8);
+    WiFi.config(staticIP, gateway, subnet, dns);
+    WiFi.begin("Boring", "SoooBoring");
+    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+        delay(5000);
+        ESP.restart();
+    }
+
+        // --- OTA SETUP ---
+        ArduinoOTA.setHostname("SleepyESP8266");
+        ArduinoOTA.onStart([]() {
+            // Optional: azioni all'inizio OTA
+        });
+        ArduinoOTA.onEnd([]() {
+            // Optional: azioni alla fine OTA
+        });
+        ArduinoOTA.onError([](ota_error_t error) {
+            // Optional: gestione errori OTA
+        });
+        ArduinoOTA.begin();
     // Serial.begin(115200);  // DISABILITATO: TX/RX usati per display
     delay(1000);
     // Serial.println("\n\n=== Sleepy Timer Starting ===");
@@ -59,6 +88,7 @@ void setup() {
 }
 
 void loop() {
+    ArduinoOTA.handle();
     bool needsUpdate = false;
     static int lastHH = 0, lastMM = 0, lastSS = 0;
     static int lastCursor = 0;
