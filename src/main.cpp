@@ -194,6 +194,7 @@ void loop() {
     // Gestione reset
     if (menu_reset_requested()) {
         timer_reset();
+        menu_set_timer(0, 0, 0); // Sincronizza subito il menu
         menu_clear_reset();
         needsUpdate = true;
     }
