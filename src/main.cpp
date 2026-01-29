@@ -1,6 +1,8 @@
+#include <EEPROM.h>
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ArduinoOTA.h>
+#include "WebServer.h"
 #include "Encoder.h"
 #include "Menu.h"
 #include "Timer.h"
@@ -84,10 +86,14 @@ void setup() {
     // Beta = 3950, R0 = 10k at 25°C, Series resistor = 10.28k
     ntcReader.setNTCParameters(10000.0, 25.0, 3950.0, 10280.0);
     
+    // Setup web server
+    setupWebServer();
+    
     // Serial.println("Setup complete!");
 }
 
 void loop() {
+    handleWebServer();
     ArduinoOTA.handle();
     bool needsUpdate = false;
     static int lastHH = 0, lastMM = 0, lastSS = 0;
@@ -98,9 +104,8 @@ void loop() {
     static PageType lastPage = PAGE_TIMER;
     
     // Temperature control variables
-    static float tempSetpoint = 25.0;
+    extern PIDParams pidParams;
     static float tempActual = 22.5;
-    static bool tempEnabled = false;
     static unsigned long lastTempRead = 0;
     static unsigned long lastTempUpdate = 0;
     static unsigned long lastDisplayUpdate = 0;
@@ -108,8 +113,19 @@ void loop() {
     static float lastTempActual = -999.0;    // Track for display updates
     static float lastPidOutput = -999.0;     // Track for display updates
     
+    // Sincronizza tempSetpoint e tempEnabled con pidParams (modificabili da webserver)
+    float tempSetpoint = pidParams.setpoint;
+    bool tempEnabled = pidParams.enabled;
+    
     encoder_update();
     if (encoder_was_moved()) {
+        // Wake up display se in sleep
+        if (eink_is_sleeping()) {
+            eink_wake_up();
+            encoder_reset_flags();  // Ignora questo movimento, serve solo per wake
+            return;
+        }
+        
         int dir = -encoder_get_direction(); // Inverti direzione per logica menu
         
         if (menu_is_editing()) {
@@ -119,9 +135,10 @@ void loop() {
                 // Edit heating page fields
                 int cursor = menu_get_cursor();
                 if (cursor == 0) {  // Setpoint
-                    tempSetpoint += dir * 0.5;
-                    if (tempSetpoint < 10.0) tempSetpoint = 10.0;
-                    if (tempSetpoint > 50.0) tempSetpoint = 50.0;
+                    pidParams.setpoint += dir * 0.5;
+                    if (pidParams.setpoint < 10.0) pidParams.setpoint = 10.0;
+                    if (pidParams.setpoint > 50.0) pidParams.setpoint = 50.0;
+                    tempSetpoint = pidParams.setpoint;  // Sincronizza locale
                 }
             } else {
                 menu_edit_field(dir);
@@ -133,6 +150,13 @@ void loop() {
     }
     
     if (encoder_was_long_pressed()) {
+        // Wake up display se in sleep
+        if (eink_is_sleeping()) {
+            eink_wake_up();
+            encoder_reset_flags();
+            return;
+        }
+        
         // Long press: switch page
         PageType currentPage = menu_get_current_page();
         if (currentPage == PAGE_TIMER) {
@@ -142,6 +166,13 @@ void loop() {
         }
         needsUpdate = true;
     } else if (encoder_was_clicked()) {
+        // Wake up display se in sleep
+        if (eink_is_sleeping()) {
+            eink_wake_up();
+            encoder_reset_flags();
+            return;
+        }
+        
         // Normal click: handle menu actions
         PageType currentPage = menu_get_current_page();
         if (currentPage == PAGE_HEATING) {
@@ -149,7 +180,8 @@ void loop() {
             if (cursor == 0) {  // Setpoint field
                 menu_handle_click();  // Toggle editing
             } else if (cursor == 1) {  // Enable/Disable button
-                tempEnabled = !tempEnabled;
+                pidParams.enabled = !pidParams.enabled;
+                tempEnabled = pidParams.enabled;
                 if (tempEnabled) {
                     tempController.setSetpoint(tempSetpoint);
                     tempController.enable();
@@ -169,7 +201,8 @@ void loop() {
     // Read temperature sensor periodically (every 500ms)
     unsigned long now = millis();
     if (now - lastTempRead >= 500) {
-        tempActual = ntcReader.readTemperature();
+        extern PIDParams pidParams;
+        tempActual = ntcReader.readTemperature() + pidParams.compensazione;
         lastTempRead = now;
     }
     
@@ -246,6 +279,14 @@ void loop() {
             float pidOutput = tempController.getOutput();
             drawHeatingPage(cursor, editing, tempSetpoint, tempActual, tempEnabled, pidOutput);
         }
+    }
+    
+    // Controlla e gestisci sleep mode
+    eink_check_sleep(tempEnabled, running);
+    
+    // Forza aggiornamento se appena uscito da sleep
+    if (eink_needs_redraw_after_wake()) {
+        needsUpdate = true;
     }
 
     delay(10);

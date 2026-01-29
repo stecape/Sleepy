@@ -127,13 +127,84 @@ void drawHeader(PageType currentPage) {
 // Static flags for forcing redraw
 static bool forceTimerRedraw = true;
 static bool forceHeatingRedraw = true;
+static unsigned long lastRefreshTime = 0;
+static uint16_t refreshCounter = 0;
+static bool displaySleeping = false;
+static unsigned long lastActivityTime = 0;
+static bool justWokenUp = false;  // Flag per forzare ridisegno dopo wake
+#define REFRESH_DEBOUNCE_MS 1000
+#define CLEAR_EVERY_N_REFRESHES 100
+#define SLEEP_TIMEOUT_MS 120000  // 2 minuti
 
 void eink_force_redraw() {
     forceTimerRedraw = true;
     forceHeatingRedraw = true;
+    refreshCounter = 0;  // Reset contatore per evitare clear immediato
+}
+
+bool eink_is_sleeping() {
+    return displaySleeping;
+}
+
+bool eink_needs_redraw_after_wake() {
+    if (justWokenUp) {
+        justWokenUp = false;
+        return true;
+    }
+    return false;
+}
+
+void eink_wake_up() {
+    if (displaySleeping) {
+        digitalWrite(TFT_LED, HIGH);  // Accendi backlight
+        tft.fillScreen(COLOR_BG);     // Clear completo
+        eink_force_redraw();
+        displaySleeping = false;
+        justWokenUp = true;  // Segnala che serve ridisegno completo
+        lastActivityTime = millis();
+    }
+}
+
+void eink_check_sleep(bool heatingEnabled, bool timerRunning) {
+    unsigned long now = millis();
+    
+    // Se c'è attività, aggiorna timestamp
+    if (heatingEnabled || timerRunning) {
+        lastActivityTime = now;
+        if (displaySleeping) {
+            eink_wake_up();
+        }
+        return;
+    }
+    
+    // Se non sleeping e timeout scaduto, vai in sleep
+    if (!displaySleeping && (now - lastActivityTime > SLEEP_TIMEOUT_MS)) {
+        displaySleeping = true;
+        tft.fillScreen(COLOR_BG);
+        digitalWrite(TFT_LED, LOW);  // Spegni backlight
+    }
 }
 
 void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bool finished) {
+    // Ignora aggiornamenti se display in sleep
+    if (displaySleeping) return;
+    
+    // Debounce refresh: minimo 1 secondo tra aggiornamenti
+    unsigned long now = millis();
+    if (now - lastRefreshTime < REFRESH_DEBOUNCE_MS) {
+        return;
+    }
+    lastRefreshTime = now;
+    lastActivityTime = now;  // Aggiorna timestamp attività
+    
+    // Incrementa contatore e clear periodico ogni 100 refresh
+    refreshCounter++;
+    if (refreshCounter >= CLEAR_EVERY_N_REFRESHES) {
+        tft.fillScreen(COLOR_BG);
+        forceTimerRedraw = true;
+        refreshCounter = 0;
+    }
+    
     static int lastCursor = -1;
     static bool lastEditing = false;
     static int lastHH = -1, lastMM = -1, lastSS = -1;
@@ -238,6 +309,25 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
 }
 
 void drawHeatingPage(int cursor, bool editing, float setpoint, float actual, bool enabled, float output) {
+    // Ignora aggiornamenti se display in sleep
+    if (displaySleeping) return;
+    
+    // Debounce refresh: minimo 1 secondo tra aggiornamenti
+    unsigned long now = millis();
+    if (now - lastRefreshTime < REFRESH_DEBOUNCE_MS) {
+        return;
+    }
+    lastRefreshTime = now;
+    lastActivityTime = now;  // Aggiorna timestamp attività
+    
+    // Incrementa contatore e clear periodico ogni 100 refresh
+    refreshCounter++;
+    if (refreshCounter >= CLEAR_EVERY_N_REFRESHES) {
+        tft.fillScreen(COLOR_BG);
+        forceHeatingRedraw = true;
+        refreshCounter = 0;
+    }
+    
     static int lastCursor = -1;
     static bool lastEditing = false;
     static float lastSetpoint = -999;

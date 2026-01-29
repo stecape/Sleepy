@@ -1,39 +1,87 @@
 #include "TemperatureController.h"
+#include "WebServer.h"
+#include <string.h>
 
-TemperatureController::TemperatureController(uint8_t outputPin) 
-    : pin(outputPin), setpoint(25.0), enabled(false),
-      Kp(10.0), Ki(0.5), Kd(5.0),  // Default PID values (will need tuning)
-      outputMin(0.0), outputMax(100.0),
-      integral(0.0), lastError(0.0), lastUpdateTime(0),
-      output(0.0), cycleStartTime(0), outputActive(false)
+TemperatureController::TemperatureController(uint8_t outputPin)
+    : pin(outputPin), enabled(false), output(0.0), currentSetpoint(20.0), cycleStartTime(0), outputActive(false),
+      cyclePeriodMs(30000), minPulseMs(1000)
 {
     pinMode(pin, OUTPUT);
     digitalWrite(pin, LOW);
+    
+    // Inizializza PID_Handle con valori di default
+    memset(&pid, 0, sizeof(PID_Handle));
+    pid.params.Kp = 10.0f;
+    pid.params.Gp = 1.0f;
+    pid.params.Ti = 120.0f;
+    pid.params.Td = 0.0f;
+    pid.params.Taw = 0.25f;
+    pid.params.dt = 0.1f;  // Sample time fisso: 100ms
+    pid.params.out_min = 0.0f;
+    pid.params.out_max = 100.0f;
+    pid.params.ref_min = 0.0f;
+    pid.params.ref_max = 100.0f;
+    pid.params.gradiente = 0.0f;
+    pid.params.output_gradient = 0.0f;
+    pid.state.debounce_threshold = PID_DEBOUNCE_DEFAULT;
 }
 
 void TemperatureController::setSetpoint(float temp) {
-    if (temp < 10.0) temp = 10.0;
-    if (temp > 50.0) temp = 50.0;
-    setpoint = temp;
+    currentSetpoint = temp;
 }
 
 void TemperatureController::setPIDParameters(float kp, float ki, float kd) {
-    Kp = kp;
-    Ki = ki;
-    Kd = kd;
+    pid.params.Kp = kp;
+    pid.params.Gp = 1.0f;
+    pid.params.Ti = (ki > 0) ? (kp / ki) : 0.0f;
+    pid.params.Td = kd;
+    pid.params.Taw = 0.25f;
+    pid.params.dt = 0.1f;  // Sample time fisso: 100ms
+    pid.params.out_min = 0.0f;
+    pid.params.out_max = 100.0f;
+    pid.params.ref_min = 0.0f;
+    pid.params.ref_max = 100.0f;
+    pid.params.gradiente = 0.0f;
+    pid.params.output_gradient = 0.0f;
 }
 
 void TemperatureController::setOutputLimits(float min, float max) {
-    outputMin = min;
-    outputMax = max;
+    pid.params.out_min = min;
+    pid.params.out_max = max;
+}
+
+void TemperatureController::setAdvancedPIDParams(const PIDParams &params) {
+    pid.params.Kp = params.Kp;
+    pid.params.Gp = params.Gp;
+    pid.params.Ti = params.Ti;
+    pid.params.Td = params.Td;
+    pid.params.Taw = params.Taw;
+    pid.params.dt = 0.1f;  // Sample time fisso: 100ms
+    pid.params.out_min = params.out_min;
+    pid.params.out_max = params.out_max;
+    pid.params.ref_min = params.ref_min;
+    pid.params.ref_max = params.ref_max;
+    pid.params.gradiente = params.gradiente;
+    pid.params.output_gradient = params.output_gradient;
+    currentSetpoint = params.setpoint;
+    cyclePeriodMs = params.cycle_period_ms;
+    minPulseMs = params.min_pulse_ms;
 }
 
 void TemperatureController::enable() {
     if (!enabled) {
         enabled = true;
-        resetIntegral();
+        // Reset stato PID
+        pid.state.integrale = 0.0f;
+        pid.state.errore_prec = 0.0f;
+        pid.state.out = 0.0f;
+        pid.state.out_pid = 0.0f;
+        pid.state.out_tot = 0.0f;
+        pid.state.output_ramp = 0.0f;
+        pid.state.ramp_initialized = false;
+        pid.state.output_ramp_initialized = false;
+        pid.state.debounce_counter = 0;  // Reset debounce
         cycleStartTime = millis();
-        lastUpdateTime = millis();
     }
 }
 
@@ -42,11 +90,30 @@ void TemperatureController::disable() {
     output = 0.0;
     digitalWrite(pin, LOW);
     outputActive = false;
+    
+    // Reset completo stato PID
+    pid.state.integrale = 0.0f;
+    pid.state.errore_prec = 0.0f;
+    pid.state.error = 0.0f;
+    pid.state.out = 0.0f;
+    pid.state.out_pid = 0.0f;
+    pid.state.out_tot = 0.0f;
+    pid.state.proportionalCorrection = 0.0f;
+    pid.state.integralCorrection = 0.0f;
+    pid.state.derivativeCorrection = 0.0f;
+    pid.state.antiWindupContribute = 0.0f;
+    pid.state.rawOut = 0.0f;
+    pid.state.output_ramp = 0.0f;
+    pid.state.setpoint_ramp = 0.0f;
+    pid.state.ramp_initialized = false;
+    pid.state.output_ramp_initialized = false;
+    pid.state.debounce_counter = 0;
 }
 
 void TemperatureController::resetIntegral() {
-    integral = 0.0;
-    lastError = 0.0;
+    pid.state.integrale = 0.0f;
+    pid.state.errore_prec = 0.0f;
+    pid.state.ramp_initialized = false;
 }
 
 void TemperatureController::update(float currentTemp) {
@@ -57,50 +124,32 @@ void TemperatureController::update(float currentTemp) {
         return;
     }
     
-    unsigned long now = millis();
+    // Accedi a pidParams globale per manual_mode e manual_output
+    extern PIDParams pidParams;
     
-    // Calculate PID every second or on first run
-    if (lastUpdateTime == 0 || (now - lastUpdateTime) >= 1000) {
-        float dt = (now - lastUpdateTime) / 1000.0; // Convert to seconds
-        if (lastUpdateTime == 0) dt = 1.0; // First run
-        
-        // Calculate error
-        float error = setpoint - currentTemp;
-        
-        // Proportional term
-        float P = Kp * error;
-        
-        // Integral term with anti-windup
-        // Only integrate if output is not saturated or error is reducing saturation
-        if ((output >= outputMin && output <= outputMax) || 
-            (output <= outputMin && error > 0) || 
-            (output >= outputMax && error < 0)) {
-            integral += error * dt;
-            
-            // Additional anti-windup: clamp integral
-            float maxIntegral = 100.0 / Ki;  // Prevent integral from dominating
-            if (integral > maxIntegral) integral = maxIntegral;
-            if (integral < -maxIntegral) integral = -maxIntegral;
-        }
-        float I = Ki * integral;
-        
-        // Derivative term
-        float derivative = (error - lastError) / dt;
-        float D = Kd * derivative;
-        
-        // Calculate output
-        output = P + I + D;
-        
-        // Clamp output to limits
-        if (output < outputMin) output = outputMin;
-        if (output > outputMax) output = outputMax;
-        
-        // Store for next iteration
-        lastError = error;
-        lastUpdateTime = now;
+    // Forza l'applicazione immediata del cambio di modalità (bypassa debounce se richiesto)
+    static bool lastManualMode = false;
+    if (pidParams.manual_mode != lastManualMode) {
+        // Cambio di modalità richiesto: forza l'applicazione immediata
+        pid.state.manual_mode = pidParams.manual_mode;
+        pid.state.pending_mode = pidParams.manual_mode;
+        pid.state.debounce_counter = 0;
+        lastManualMode = pidParams.manual_mode;
     }
     
-    // Update time-based PWM output
+    // Chiama PID_Mngt con i parametri appropriati
+    output = PID_Mngt(
+        &pid,
+        currentSetpoint,         // setpoint
+        currentTemp,             // measure
+        0.0f,                    // reference (feedforward)
+        false,                   // stop
+        pidParams.manual_mode,   // manual_mode dal webserver
+        true,                    // derivativeEnable
+        false,                   // awEnable - DISABILITATO per questa applicazione
+        pidParams.manual_output  // manual_output dal webserver
+    );
+    
     updateOutput();
 }
 
@@ -109,16 +158,16 @@ void TemperatureController::updateOutput() {
     unsigned long cycleElapsed = now - cycleStartTime;
     
     // Check if we need to start a new cycle
-    if (cycleElapsed >= CYCLE_PERIOD_MS) {
+    if (cycleElapsed >= cyclePeriodMs) {
         cycleStartTime = now;
         cycleElapsed = 0;
     }
     
     // Calculate ON time for this cycle based on output percentage
-    unsigned long onTime = (unsigned long)((output / 100.0) * CYCLE_PERIOD_MS);
+    unsigned long onTime = (unsigned long)((output / 100.0) * cyclePeriodMs);
     
     // Apply minimum pulse width constraint
-    if (onTime > 0 && onTime < MIN_PULSE_MS) {
+    if (onTime > 0 && onTime < minPulseMs) {
         onTime = 0;  // Too short, don't turn on
     }
     
