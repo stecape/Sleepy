@@ -123,6 +123,7 @@ void loop() {
         if (eink_is_sleeping()) {
             eink_wake_up();
             encoder_reset_flags();  // Ignora questo movimento, serve solo per wake
+            needsUpdate = true;     // Forza redraw immediato
             return;
         }
         
@@ -154,6 +155,7 @@ void loop() {
         if (eink_is_sleeping()) {
             eink_wake_up();
             encoder_reset_flags();
+            needsUpdate = true;     // Forza redraw immediato
             return;
         }
         
@@ -170,6 +172,7 @@ void loop() {
         if (eink_is_sleeping()) {
             eink_wake_up();
             encoder_reset_flags();
+            needsUpdate = true;     // Forza redraw immediato
             return;
         }
         
