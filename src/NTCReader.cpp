@@ -2,7 +2,7 @@
 
 NTCReader::NTCReader(uint8_t adcPin) 
     : pin(adcPin), lastTemp(25.0),
-      R0(10000.0), T0(298.15), Beta(3950.0), seriesR(10000.0),
+      R0(10000.0), T0(298.15), Beta(3950.0), seriesR(10280.0),
       readIndex(0), readingSum(0.0)
 {
     pinMode(pin, INPUT);
@@ -24,20 +24,20 @@ float NTCReader::readRaw() {
     // Read ADC value (0-1023 on ESP8266)
     int adcValue = analogRead(pin);
     
-    // Convert to voltage (ESP8266 ADC: 0-1V range with 1024 levels)
-    float voltage = (adcValue / 1024.0) * 1.0;
+    // Convert to voltage (ESP8266 ADC: 0-3.3V range with 1024 levels)
+    float voltage = (adcValue / 1024.0) * 3.3;
     
     // Calculate NTC resistance using voltage divider
-    // Assuming NTC is connected between ADC and GND, with series resistor to VCC
-    // V_adc = VCC * (R_ntc / (R_series + R_ntc))
-    // Solving for R_ntc: R_ntc = R_series * V_adc / (VCC - V_adc)
+    // NTC is connected between 3.3V and ADC, with series resistor (10.28k) to GND
+    // V_adc = VCC * (R_series / (R_ntc + R_series))
+    // Solving for R_ntc: R_ntc = R_series * (VCC / V_adc - 1)
     
-    if (voltage >= 0.99) {
+    if (voltage <= 0.01) {
         // Avoid division by zero
-        return R0;  // Return nominal resistance
+        return R0 * 1000;  // Return very high resistance
     }
     
-    float resistance = seriesR * voltage / (1.0 - voltage);
+    float resistance = seriesR * (3.3 / voltage - 1.0);
     
     return resistance;
 }

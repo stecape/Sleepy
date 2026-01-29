@@ -16,8 +16,8 @@
 #define ENCODER_PIN_A D1  // GPIO5  - DT
 #define ENCODER_PIN_B D2  // GPIO4  - CLK
 #define ENCODER_BTN   D0  // GPIO16 - SW
-#define OUTPUT_PIN_1  D3  // GPIO0  - TIMER
-#define OUTPUT_PIN_2  D4  // GPIO2  - TEMP CTRL
+#define OUTPUT_PIN_1  D4  // GPIO0  - TIMER
+#define OUTPUT_PIN_2  D3  // GPIO2  - TEMP CTRL
 #define OUTPUT_PIN_3  D8  // GPIO15 - LED/Extra output
 #define INPUT_NTC     A0  // ADC    - NTC (futuro)
 #define INPUT_NTC     A0  // ADC   - NTC (futuro)
@@ -51,9 +51,9 @@ void setup() {
     tempController.setPIDParameters(10.0, 0.5, 5.0);
     tempController.setOutputLimits(0.0, 100.0);
     
-    // Initialize NTC reader with typical 10k NTC parameters
-    // Beta = 3950, R0 = 10k at 25°C, Series resistor = 10k
-    ntcReader.setNTCParameters(10000.0, 25.0, 3950.0, 10000.0);
+    // Initialize NTC reader with Aussel NTC 10K 3950 parameters
+    // Beta = 3950, R0 = 10k at 25°C, Series resistor = 10.28k
+    ntcReader.setNTCParameters(10000.0, 25.0, 3950.0, 10280.0);
     
     // Serial.println("Setup complete!");
 }
@@ -73,7 +73,10 @@ void loop() {
     static bool tempEnabled = false;
     static unsigned long lastTempRead = 0;
     static unsigned long lastTempUpdate = 0;
+    static unsigned long lastDisplayUpdate = 0;
     static float lastTempSetpoint = -999.0;  // Track for display updates
+    static float lastTempActual = -999.0;    // Track for display updates
+    static float lastPidOutput = -999.0;     // Track for display updates
     
     encoder_update();
     if (encoder_was_moved()) {
@@ -176,6 +179,17 @@ void loop() {
     bool running = timer_is_running();
     bool finished = timer_is_finished();
     PageType currentPage = menu_get_current_page();
+    
+    // Check for periodic updates (every second) for temperature and PID output
+    if (currentPage == PAGE_HEATING && (now - lastDisplayUpdate >= 1000)) {
+        float pidOutput = tempController.getOutput();
+        if (abs(tempActual - lastTempActual) >= 0.1 || abs(pidOutput - lastPidOutput) >= 1.0) {
+            needsUpdate = true;
+            lastTempActual = tempActual;
+            lastPidOutput = pidOutput;
+        }
+        lastDisplayUpdate = now;
+    }
     
     // Controlla se qualcosa è cambiato
     if (hh != lastHH || mm != lastMM || ss != lastSS ||
