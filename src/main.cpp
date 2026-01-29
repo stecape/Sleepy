@@ -29,8 +29,7 @@ TemperatureController tempController(OUTPUT_PIN_2);
 NTCReader ntcReader(INPUT_NTC);
 
 void setup() {
-        // --- CONFIGURAZIONE WIFI (modifica SSID e PASSWORD!) ---
-
+    // --- CONFIGURAZIONE WIFI (modifica SSID e PASSWORD!) ---
     WiFi.mode(WIFI_STA);
     // Impostazione IP statico
     IPAddress staticIP(192, 168, 2, 58);
@@ -44,18 +43,19 @@ void setup() {
         ESP.restart();
     }
 
-        // --- OTA SETUP ---
-        ArduinoOTA.setHostname("SleepyESP8266");
-        ArduinoOTA.onStart([]() {
-            // Optional: azioni all'inizio OTA
-        });
-        ArduinoOTA.onEnd([]() {
-            // Optional: azioni alla fine OTA
-        });
-        ArduinoOTA.onError([](ota_error_t error) {
-            // Optional: gestione errori OTA
-        });
-        ArduinoOTA.begin();
+    // --- OTA SETUP ---
+    ArduinoOTA.setHostname("SleepyESP8266");
+    ArduinoOTA.onStart([]() {
+        // Optional: azioni all'inizio OTA
+    });
+    ArduinoOTA.onEnd([]() {
+        // Optional: azioni alla fine OTA
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        // Optional: gestione errori OTA
+    });
+    ArduinoOTA.begin();
+    
     // Serial.begin(115200);  // DISABILITATO: TX/RX usati per display
     delay(1000);
     // Serial.println("\n\n=== Sleepy Timer Starting ===");
