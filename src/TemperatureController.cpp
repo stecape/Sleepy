@@ -2,6 +2,11 @@
 #include "WebServer.h"
 #include <string.h>
 
+PIDParams TemperatureController::getDefaultPIDParams() {
+    // Valori di default centralizzati per tutti i parametri PID
+    return {1.0, 40.0, 0.0, 0.0, 1.0, 0.0, 100.0, 0.0, 100.0, 0.0, 0.0, 20.0, 0.0, 0.0, 30000, 1000, false, false};
+}
+
 TemperatureController::TemperatureController(uint8_t outputPin)
     : pin(outputPin), enabled(false), output(0.0), currentSetpoint(20.0), cycleStartTime(0), outputActive(false),
       cyclePeriodMs(30000), minPulseMs(1000)
@@ -11,11 +16,11 @@ TemperatureController::TemperatureController(uint8_t outputPin)
     
     // Inizializza PID_Handle con valori di default
     memset(&pid, 0, sizeof(PID_Handle));
-    pid.params.Kp = 10.0f;
-    pid.params.Gp = 1.0f;
-    pid.params.Ti = 120.0f;
+    pid.params.Kp = 1.0f;
+    pid.params.Gp = 40.0f;
+    pid.params.Ti = 0.0f;  // Integrativa disabilitata
     pid.params.Td = 0.0f;
-    pid.params.Taw = 0.25f;
+    pid.params.Taw = 1.0f;
     pid.params.dt = 0.1f;  // Sample time fisso: 100ms
     pid.params.out_min = 0.0f;
     pid.params.out_max = 100.0f;
@@ -32,10 +37,10 @@ void TemperatureController::setSetpoint(float temp) {
 
 void TemperatureController::setPIDParameters(float kp, float ki, float kd) {
     pid.params.Kp = kp;
-    pid.params.Gp = 1.0f;
-    pid.params.Ti = (ki > 0) ? (kp / ki) : 0.0f;
+    pid.params.Gp = 40.0f;
+    pid.params.Ti = 0.0f;  // Integrativa disabilitata
     pid.params.Td = kd;
-    pid.params.Taw = 0.25f;
+    pid.params.Taw = 10.0f;
     pid.params.dt = 0.1f;  // Sample time fisso: 100ms
     pid.params.out_min = 0.0f;
     pid.params.out_max = 100.0f;
@@ -145,8 +150,8 @@ void TemperatureController::update(float currentTemp) {
         0.0f,                    // reference (feedforward)
         false,                   // stop
         pidParams.manual_mode,   // manual_mode dal webserver
-        true,                    // derivativeEnable
-        false,                   // awEnable - DISABILITATO per questa applicazione
+        false,                   // derivativeEnable - DISABILITATO (solo P)
+        false,                   // awEnable - DISABILITATO (solo P)
         pidParams.manual_output  // manual_output dal webserver
     );
     

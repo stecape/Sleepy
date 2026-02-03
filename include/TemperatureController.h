@@ -2,9 +2,12 @@
 #include <Arduino.h>
 #include "AdvancedPID.h"
 
+struct PIDParams;  // Forward declaration
+
 class TemperatureController {
 public:
     TemperatureController(uint8_t outputPin);
+    static struct PIDParams getDefaultPIDParams();  // Valori di default centralizzati
     void setSetpoint(float temp);
     void setPIDParameters(float kp, float ki, float kd);
     void setOutputLimits(float min, float max);

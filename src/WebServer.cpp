@@ -5,8 +5,10 @@
 #include "Timer.h"
 #include "Menu.h"
 
+#include "TemperatureController.h"
+
 ESP8266WebServer server(80);
-PIDParams pidParams = {12.0, 1.0, 120.0, 0.0, 0.25, 0.0, 100.0, 0.0, 100.0, 0.0, 0.0, 20.0, 0.0, 0.0, 5000, 500, false, false};
+PIDParams pidParams = TemperatureController::getDefaultPIDParams();
 
 #define EEPROM_SIZE 64
 #define EEPROM_PID_ADDR 0
@@ -22,7 +24,7 @@ void loadPIDParamsFromEEPROM() {
         isnan(pidParams.Taw) || isnan(pidParams.setpoint) ||
         pidParams.cycle_period_ms == 0 || pidParams.cycle_period_ms > 300000) {
         // Ripristina valori di default
-        pidParams = {12.0, 1.0, 120.0, 0.0, 0.25, 0.0, 100.0, 0.0, 100.0, 0.0, 0.0, 20.0, 0.0, 0.0, 5000, 500, false, false};
+        pidParams = TemperatureController::getDefaultPIDParams();
         // Salva immediatamente i default in EEPROM
         savePIDParamsToEEPROM();
     }
@@ -173,6 +175,10 @@ void setupWebServer() {
         html += "<button type='submit' class='btn-save'>💾 Salva</button>";
         html += "<a href='/'><button type='button' class='btn-back'>← Indietro</button></a>";
         html += "</form>";
+        html += "<form method='POST' action='/reset_defaults' style='margin-top:20px;padding:15px;background:#fff3cd;border-radius:5px'>";
+        html += "<p style='margin:10px 0'><b>⚠️ Reset ai valori di default:</b> Kp=1.0, Gp=40.0, Ti=0.0 (solo P)</p>";
+        html += "<button type='submit' style='background:#dc3545;color:white'>🔄 Reset Defaults</button>";
+        html += "</form>";
         html += "</div></body></html>";
         server.send(200, "text/html", html);
     });
@@ -229,6 +235,15 @@ void setupWebServer() {
         }
         server.sendHeader("Location", "/", true);
         server.send(302, "text/plain", "Updated");
+    });
+    
+    // Handler per reset parametri PID a default
+    server.on("/reset_defaults", HTTP_POST, []() {
+        pidParams = TemperatureController::getDefaultPIDParams();
+        savePIDParamsToEEPROM();
+        tempController.setAdvancedPIDParams(pidParams);
+        server.sendHeader("Location", "/settings", true);
+        server.send(302, "text/plain", "Reset to defaults");
     });
     
     // Handler per controlli timer
