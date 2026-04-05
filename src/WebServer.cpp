@@ -10,7 +10,7 @@
 ESP8266WebServer server(80);
 PIDParams pidParams = TemperatureController::getDefaultPIDParams();
 
-#define EEPROM_SIZE 64
+#define EEPROM_SIZE 128
 #define EEPROM_PID_ADDR 0
 
 extern TemperatureController tempController;
