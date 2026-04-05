@@ -132,7 +132,6 @@ static uint16_t refreshCounter = 0;
 static bool displaySleeping = false;
 static unsigned long lastActivityTime = 0;
 static bool justWokenUp = false;  // Flag per forzare ridisegno dopo wake
-#define REFRESH_DEBOUNCE_MS 1000
 #define CLEAR_EVERY_N_REFRESHES 100
 #define SLEEP_TIMEOUT_MS 120000  // 2 minuti
 
@@ -188,12 +187,8 @@ void eink_check_sleep(bool heatingEnabled, bool timerRunning) {
 void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bool finished) {
     // Ignora aggiornamenti se display in sleep
     if (displaySleeping) return;
-    
-    // Debounce refresh: minimo 1 secondo tra aggiornamenti
+
     unsigned long now = millis();
-    if (now - lastRefreshTime < REFRESH_DEBOUNCE_MS) {
-        return;
-    }
     lastRefreshTime = now;
     lastActivityTime = now;  // Aggiorna timestamp attività
     
@@ -311,12 +306,8 @@ void drawMenu(int cursor, bool editing, int hh, int mm, int ss, bool running, bo
 void drawHeatingPage(int cursor, bool editing, float setpoint, float actual, bool enabled, float output) {
     // Ignora aggiornamenti se display in sleep
     if (displaySleeping) return;
-    
-    // Debounce refresh: minimo 1 secondo tra aggiornamenti
+
     unsigned long now = millis();
-    if (now - lastRefreshTime < REFRESH_DEBOUNCE_MS) {
-        return;
-    }
     lastRefreshTime = now;
     lastActivityTime = now;  // Aggiorna timestamp attività
     
