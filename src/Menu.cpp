@@ -22,13 +22,6 @@ static PageType currentPage = PAGE_TIMER;
 #define HEATING_SETPOINT 0
 #define HEATING_ENABLE 1
 
-// Header click regions (x coordinates on 160x128 display, rotation 3)
-#define HEADER_TIMER_X1 0
-#define HEADER_TIMER_X2 80
-#define HEADER_HEATING_X1 80
-#define HEADER_HEATING_X2 160
-#define HEADER_Y1 0
-#define HEADER_Y2 20
 
 void menu_init() {
     cursor = 0;
@@ -115,22 +108,3 @@ void menu_set_page(PageType page) {
     eink_force_redraw();
 }
 
-bool menu_handle_header_click(int x, int y) {
-    // Check if click is in header area
-    if (y >= HEADER_Y1 && y <= HEADER_Y2) {
-        if (x >= HEADER_TIMER_X1 && x < HEADER_TIMER_X2) {
-            // Clicked on TIMER
-            if (currentPage != PAGE_TIMER) {
-                menu_set_page(PAGE_TIMER);
-                return true;
-            }
-        } else if (x >= HEADER_HEATING_X1 && x < HEADER_HEATING_X2) {
-            // Clicked on HEATING
-            if (currentPage != PAGE_HEATING) {
-                menu_set_page(PAGE_HEATING);
-                return true;
-            }
-        }
-    }
-    return false;
-}

@@ -86,8 +86,8 @@ Validazione al boot: se uno dei float è NaN o `cycle_period_ms == 0 || > 300000
 
 ## Encoder
 
-- Lettura in **polling** da `encoder_update()` chiamata una volta per loop (~10ms). Il codice ISR (`encoder_isr`) esiste ma non è collegato (`attachInterrupt` non chiamato in `encoder_init`) — è codice morto.
-- Polling semplificato: rileva solo il **falling edge di pin A**; il rising edge aggiorna `lastA` ma non genera eventi. Una rotazione rapida può perdere step se il pin A cambia due volte tra una chiamata e l'altra.
+- Lettura in **polling** da `encoder_update()`, chiamata una volta per loop (~10ms).
+- Polling semplificato: rileva solo il **falling edge di pin A**; il rising edge aggiorna `lastA` ma non genera eventi. Una rotazione rapida può perdere step se pin A cambia due volte tra una chiamata e l'altra.
 - Direzione invertita rispetto al segnale fisico: `dir = -encoder_get_direction()` in main.cpp.
 - Long press (>800ms) → cambia pagina (Timer ↔ Heating). Short click → azione menu.
 - Durante sleep: qualsiasi evento encoder sveglia il display (`eink_wake_up()`) e consuma l'evento senza elaborarlo (ignora il movimento/click di wake).

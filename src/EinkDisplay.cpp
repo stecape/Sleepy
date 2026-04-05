@@ -131,7 +131,6 @@ static unsigned long lastRefreshTime = 0;
 static uint16_t refreshCounter = 0;
 static bool displaySleeping = false;
 static unsigned long lastActivityTime = 0;
-static bool justWokenUp = false;  // Flag per forzare ridisegno dopo wake
 #define CLEAR_EVERY_N_REFRESHES 100
 #define SLEEP_TIMEOUT_MS 120000  // 2 minuti
 
@@ -145,21 +144,12 @@ bool eink_is_sleeping() {
     return displaySleeping;
 }
 
-bool eink_needs_redraw_after_wake() {
-    if (justWokenUp) {
-        justWokenUp = false;
-        return true;
-    }
-    return false;
-}
-
 void eink_wake_up() {
     if (displaySleeping) {
         digitalWrite(TFT_LED, HIGH);  // Accendi backlight
         tft.fillScreen(COLOR_BG);     // Clear completo
         eink_force_redraw();
         displaySleeping = false;
-        justWokenUp = true;  // Segnala che serve ridisegno completo
         lastActivityTime = millis();
     }
 }
@@ -444,10 +434,3 @@ void drawHeatingPage(int cursor, bool editing, float setpoint, float actual, boo
     lastEditing = editing;
 }
 
-void eink_backlight_on() {
-    digitalWrite(TFT_LED, HIGH);
-}
-
-void eink_backlight_off() {
-    digitalWrite(TFT_LED, LOW);
-}

@@ -287,10 +287,5 @@ void loop() {
     // Controlla e gestisci sleep mode
     eink_check_sleep(tempEnabled, running);
     
-    // Forza aggiornamento se appena uscito da sleep
-    if (eink_needs_redraw_after_wake()) {
-        needsUpdate = true;
-    }
-
     delay(10);
 }

@@ -22,4 +22,3 @@ void menu_clear_reset();
 // Page navigation
 PageType menu_get_current_page();
 void menu_set_page(PageType page);
-bool menu_handle_header_click(int x, int y);  // Returns true if header was clicked
